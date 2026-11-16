@@ -14,7 +14,7 @@ while the application keeps working exactly as before.
 |---|---|
 | **Starting point** | `FROM openjdk:17-jdk-slim`, runs as root, full JDK in the final image |
 | **Target** | An approved `eclipse-temurin` image, pinned tag, JRE-only runtime, non-root user, multi-stage build |
-| **Tools** | Docker (Docker Desktop or equivalent), Trivy or Docker Scout, Bruno |
+| **Tools** | A container tool (Podman recommended; Docker Desktop is **not** required), Trivy, Bruno |
 | **Application** | Spring Boot 3.5 on Java 17 or newer (no code changes needed) |
 | **Time budget** | **4 hours in total, spread over 2 days** |
 
@@ -27,19 +27,38 @@ By the end you will be able to:
 - Scan an image, read the result, and show a before-and-after improvement.
 
 ## 3. Prerequisites
-- **Docker** installed and running (`docker version` works).
+- **A container tool** that can build an image from a `Dockerfile` and run it. See section 3.1. **Docker Desktop is not required.**
 - **JDK 17 or newer** to build the jar locally for the baseline step.
-- **Trivy** (https://trivy.dev) **or** Docker Scout (built into recent Docker Desktop) for scanning.
+- **Trivy** (https://trivy.dev), an open-source scanner that works with any container tool.
 - **Bruno** to test the API.
 - Internet access (images and libraries are downloaded).
+
+### 3.1 Choose your container tool
+Any of these works. The `Dockerfile` and the images are the same for all of them.
+
+| Tool | Cost and notes | Check it works |
+|---|---|---|
+| **Podman** (recommended) | Free and open source. Runs containers without a background service, and without root rights by default. On Windows and Mac it uses a small virtual machine. Install from https://podman.io. | `podman version` |
+| **Docker Engine** (Linux, or inside WSL2 on Windows) | Free. | `docker version` |
+| **Rancher Desktop** | Free. Choose its Docker-compatible mode to get the `docker` command. | `docker version` |
+| **Docker Desktop** | Works, but needs a paid licence in larger companies. Use it only if your company already licenses it. | `docker version` |
+
+**Commands in this document use `podman`.** If your tool provides the `docker` command, type `docker` instead. The arguments are the same.
+
+If you use Podman on Windows or Mac, set up its virtual machine once, then start it whenever your computer restarts:
+
+```bash
+podman machine init
+podman machine start
+```
 
 ## 4. Getting started
 Clone the starter project, then build the jar, build the image and run it:
 
 ```bash
 gradlew.bat bootJar
-docker build -t onboarding-tracker:before .
-docker run --rm -p 8080:8080 onboarding-tracker:before
+podman build -t onboarding-tracker:before .
+podman run --rm -p 8080:8080 onboarding-tracker:before
 ```
 
 On macOS or Linux, use `./gradlew` instead of `gradlew.bat`. If port 8080 is busy, use `-p 8081:8080` and call port 8081.
@@ -55,15 +74,15 @@ Check it works: `GET http://localhost:8080/actuator/health` returns `{"status":"
 | C2 | **Choose the base image.** Read `PLATFORM_STANDARDS.md`. Pick an approved image and tag, and write one sentence on why `openjdk:17-jdk-slim` is not acceptable. | Your choice and reason written down. |
 | C3 | **Change the base image and pin the tag.** No `latest`. The runtime stage must use a JRE image. | `Dockerfile` uses an approved, pinned image. |
 | C4 | **Make it a multi-stage build.** Build the jar inside the image (JDK stage), then copy only the jar into a JRE stage. Add a `.dockerignore`. | The image builds without running `gradlew bootJar` on your machine first. |
-| C5 | **Run as a non-root user.** Create a user in the `Dockerfile` and switch to it with `USER`. Make sure the app can still write its database files. | `docker run ... id` shows a non-root user, and `POST /api/employees` still returns `201`. |
+| C5 | **Run as a non-root user.** Create a user in the `Dockerfile` and switch to it with `USER`. Make sure the app can still write its database files. | `podman run ... id` shows a non-root user, and `POST /api/employees` still returns `201`. |
 | C6 | **Prove it works.** Build the new image as `onboarding-tracker:after`, run it, and repeat the Bruno checks from section 4. | Same results as before. Screenshot of Bruno. |
 | C7 | **Scan again and compare.** | A before-and-after table: size, CRITICAL, HIGH, user. The image passes the gate in section 3 of `PLATFORM_STANDARDS.md`, or you list the remaining findings with a reason. |
 
 ### 5.2 Stretch tasks (optional)
 - **S1: Pin by digest.** Pin the base image by `@sha256:` digest as well as tag, and explain the trade-off (safer builds, but you must update the digest on purpose).
-- **S2: Add a `HEALTHCHECK`.** Use `/actuator/health`. Check first which tools exist in your image (some minimal images have no `curl`).
+- **S2: Add a `HEALTHCHECK`.** Use `/actuator/health`. Check first which tools exist in your image (some minimal images have no `curl`). With Podman, add `--format docker` to `podman build`, or the `HEALTHCHECK` line is ignored.
 - **S3: Container-aware JVM settings.** Set memory limits on the container and tune the JVM with `-XX:MaxRAMPercentage`. Show how the heap size follows the container limit.
-- **S4: Generate an SBOM** (software bill of materials) for the image with Trivy or Docker Scout, and list the five largest packages.
+- **S4: Generate an SBOM** (software bill of materials) for the image with Trivy, and list the five largest packages.
 - **S5: Harden the runtime.** Run with `--read-only`, `--cap-drop ALL` and a writable volume only for the data folder. Does the app still work?
 - **S6: Try a smaller base** (for example an `-alpine` variant, if one exists for your Java version) and compare scan results and size. Note any compatibility issues.
 
@@ -71,7 +90,7 @@ Check it works: `GET http://localhost:8080/actuator/health` returns `{"status":"
 
 | Day | Time | Steps |
 |---|---|---|
-| **Day 1** | 45 min | Set up Docker and the scanner, build and run the `before` image, baseline (C1) |
+| **Day 1** | 45 min | Set up your container tool and the scanner, build and run the `before` image, baseline (C1) |
 | | 30 min | Read the standards, choose the image (C2) |
 | | 60 min | Change the base image, then convert to multi-stage with `.dockerignore` (C3, C4) |
 | **Day 2** | 45 min | Non-root user and file permissions (C5) |
@@ -119,31 +138,31 @@ The examples use made-up names (`myapp`) so you can see the pattern. Apply it to
 ### A.1 How to work
 1. Change one thing at a time, then rebuild and run.
 2. Commit after each task.
-3. Read the **first** error in the Docker build output.
+3. Read the **first** error in the image build output.
 4. If you are stuck for 15 minutes, ask a colleague or the instructor.
 
 ### A.2 Choosing and pinning the base image
 ```dockerfile
 # BEFORE: deprecated image, full JDK, moving target
-FROM openjdk:17-jdk-slim
+FROM docker.io/library/openjdk:17-jdk-slim
 
 # AFTER: approved image, specific version, JRE only (runtime stage)
-FROM eclipse-temurin:21-jre
+FROM docker.io/library/eclipse-temurin:21-jre
 ```
-Check the available tags on Docker Hub (search for `eclipse-temurin`) and the allowed list in `PLATFORM_STANDARDS.md`. A tag like `21-jre` follows the 21 line, so rebuilds pick up security fixes. A tag like `latest` can change under you without warning, so never use it.
+The `docker.io/library/` part names the registry (Docker Hub's official images). Writing it in full makes the build work the same on every tool. Podman, unlike Docker, may refuse or ask you to choose a registry when the name is short. Check the available tags on Docker Hub (search for `eclipse-temurin`) and the allowed list in `PLATFORM_STANDARDS.md`. A tag like `21-jre` follows the 21 line, so rebuilds pick up security fixes. A tag like `latest` can change under you without warning, so never use it.
 
 ### A.3 The multi-stage pattern
 Stage 1 has the tools to build. Stage 2 is small and only runs the result.
 
 ```dockerfile
 # ---- Stage 1: build ----
-FROM eclipse-temurin:21-jdk AS build
+FROM docker.io/library/eclipse-temurin:21-jdk AS build
 WORKDIR /src
 COPY . .
 RUN ./gradlew bootJar --no-daemon
 
 # ---- Stage 2: run ----
-FROM eclipse-temurin:21-jre
+FROM docker.io/library/eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /src/build/libs/myapp-0.0.1-SNAPSHOT.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]
@@ -175,21 +194,30 @@ Tips:
 - The user commands differ by operating system (Debian or Ubuntu use `groupadd` and `useradd`, Alpine uses `addgroup` and `adduser`). Check which your image uses.
 - The H2 database writes to `./data`, relative to the working directory. A non-root user needs write permission on that folder, or the app fails at startup with a permission error.
 - The database location can also be set with the `DB_URL` environment variable.
-- Check the user with: `docker run --rm onboarding-tracker:after id`.
+- Check the user with: `podman run --rm onboarding-tracker:after id`.
 
 ### A.6 Scanning
+Trivy reads images from your container tool's storage. With Podman, save the image to a file and scan the file, which works with any tool:
+
 ```bash
-trivy image onboarding-tracker:before
-trivy image --severity CRITICAL,HIGH onboarding-tracker:after
-docker scout quickview onboarding-tracker:after
+podman save -o before.tar onboarding-tracker:before
+trivy image --input before.tar
+
+podman save -o after.tar onboarding-tracker:after
+trivy image --severity CRITICAL,HIGH --input after.tar
 ```
-Use only one tool for the whole exercise so the numbers can be compared. Findings change daily as new vulnerabilities are published, so scan **before and after on the same day**. Image size: `docker images onboarding-tracker`.
+If your tool provides the `docker` command, you can scan by name instead: `trivy image onboarding-tracker:before`.
+
+Use the same scanner for the whole exercise so the numbers can be compared. Findings change daily as new vulnerabilities are published, so scan **before and after on the same day**. Image size: `podman images onboarding-tracker`.
 
 ### A.7 Common problems
 
 | What you see | Usual cause | What to try |
 |---|---|---|
 | `manifest unknown` or `not found` when pulling | The tag does not exist | Check the exact tag on Docker Hub |
+| `short-name resolution` error, or a prompt to choose a registry (Podman) | The image name has no registry in front | Write the full name, for example `docker.io/library/eclipse-temurin:21-jre` |
+| `Cannot connect to Podman` or a machine error (Windows and Mac) | The Podman virtual machine is not running | Run `podman machine start` |
+| `HEALTHCHECK` has no effect (Podman) | Podman builds in OCI format, which drops it | Build with `podman build --format docker ...` |
 | `COPY failed: file not found` | Wrong jar name or path | Run `gradlew.bat bootJar` and look in `build/libs` |
 | `gradlew: permission denied` or `not found` in the build stage | Line endings or file mode copied from Windows | Use `RUN sh gradlew bootJar`, and check line endings |
 | App fails at startup with a file or permission error | The non-root user cannot write to the data folder | Create the folder and `chown` it before `USER` |
@@ -200,7 +228,7 @@ Use only one tool for the whole exercise so the numbers can be compared. Finding
 ### A.8 Final checklist
 - [ ] Base image is approved, supported and pinned (no `latest`).
 - [ ] The final image uses a JRE, not a JDK.
-- [ ] Multi-stage build works from a clean clone with only `docker build`.
+- [ ] Multi-stage build works from a clean clone with only `podman build` (or `docker build`).
 - [ ] `.dockerignore` exists.
 - [ ] The container runs as a non-root user.
 - [ ] Bruno checks give the same results as before.

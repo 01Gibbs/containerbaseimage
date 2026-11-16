@@ -9,6 +9,8 @@ Images must come from this list. Anything else needs an exception.
 |---|---|---|
 | `eclipse-temurin` | `21-jre`, `21-jdk`, `25-jre`, `25-jdk` (LTS versions only) | Runtime images use `-jre`. Build stages may use `-jdk`. |
 
+Write the registry in full, for example `docker.io/library/eclipse-temurin:21-jre`. This is the same approved image, and it builds the same way on every container tool.
+
 Not approved: `openjdk` (deprecated on Docker Hub and no longer updated), any image tagged `latest`, any end-of-life Java or operating system release.
 
 ## 2. Image rules

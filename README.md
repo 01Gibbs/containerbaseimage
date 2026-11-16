@@ -2,7 +2,10 @@
 
 Spring Boot 3.5 REST API with embedded H2, packaged by a `Dockerfile` that uses an outdated base image. Read [PROBLEM_STATEMENT.md](PROBLEM_STATEMENT.md) first, and [PLATFORM_STANDARDS.md](PLATFORM_STANDARDS.md) for the approved image rules.
 
-## Run the app without Docker
+## Container tool
+Docker Desktop is not required. Use Podman (recommended) or any Docker-compatible engine. See section 3.1 of the problem statement.
+
+## Run the app without a container
 ```
 gradlew.bat bootRun        (macOS/Linux: ./gradlew bootRun)
 gradlew.bat test
