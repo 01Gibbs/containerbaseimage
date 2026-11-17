@@ -1,0 +1,15 @@
+# Keep the build context small and clean: only gradlew, gradle/, the build scripts and src/ are needed.
+.git/
+.gitignore
+.gitattributes
+.gradle/
+build/
+data/
+.idea/
+.vscode/
+*.iml
+*.md
+*.docx
+gradlew.bat
+Dockerfile
+.dockerignore
